@@ -1,0 +1,322 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.game{
+  width: 100%;
+  height: auto;
+}
+
+h1 {
+  width: 100%;
+  padding: 10px 0;
+  font-size: clamp(1.9rem, 5vw, 3rem);
+  line-height: 1.1;
+  border: 1px solid #f2f2f223;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border-radius: 10px;
+}
+
+p {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  line-height: 1.5;
+}
+
+.room-connect {
+  display: flex;
+  gap: 0.5rem; /* espacio entre input y button */
+  width: 100%;
+  max-width: 500px; /* opcional, para no ser gigante en escritorio */
+  align-items: center;
+}
+
+.room-connect input {
+  flex: 2; /* ocupa más espacio que el botón */
+  padding: 0.6rem 1rem;
+  font-size: clamp(1rem, 2vw, 1.2rem); /* texto grande para ROOMID */
+  border: 2px solid #f2f2f223;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.room-connect button {
+  flex: 1; 
+  padding: 0.6em 1.2em;
+  font-size: clamp(0.9rem, 1.5vw, 1rem);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  color: #f2f2f2;
+  cursor: pointer;
+  transition: border-color 0.25s, color 0.25s;
+}
+
+.room-connect button.connected {
+  color: #28a745; /* verde vivo cuando está conectado */
+}
+
+.room-connect button:hover {
+  border-color: #646cff;
+}
+
+.room-connect button:focus,
+.room-connect button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+
+label {
+  display: block;
+  font-size: clamp(0.9rem, 2vw, 1rem);
+  font-weight: 500;
+  color: #f2f2f28e;
+  padding: 0 5px;
+  margin-bottom: 0.5rem;
+  text-align: left;
+}
+
+.player {
+  display: flex;
+  flex-direction: column; /* apila input y button verticalmente */
+  align-items: stretch;   /* que ocupen todo el ancho disponible */
+  gap: 0.75rem;           /* separación entre input y button */
+  width: 100%;
+  max-width: 500px;       /* opcional, para no ser demasiado ancho en desktop */
+  margin: 0 auto;         /* centra horizontalmente si quieres */
+  padding: 1rem;
+  box-sizing: border-box; /* asegura que padding no rompa el ancho */
+}
+
+input,
+button {
+  width: 100%;            /* ocupa todo el ancho del contenedor */
+  box-sizing: border-box; /* evita que padding + border se salga del contenedor */
+}
+
+
+input {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.75rem 1rem;
+  font-size: clamp(0.9rem, 2vw, 1rem);
+  border: 2px solid #f2f2f223;
+  border-radius: 8px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+/* Cuando pasas el mouse encima */
+input:hover {
+  border-color: #646cff;
+}
+
+/* Cuando el input está en foco */
+input:focus,
+input:focus-visible {
+  outline: none; 
+  border-color: #646cff;
+  box-shadow: 0 0 0 4px rgba(100, 108, 255, 0.3);
+}
+
+small {
+  display: block;
+  font-size: clamp(0.75rem, 1.5vw, 0.85rem);
+  color: #666;
+  margin-top: 0.25rem;
+  text-align: left;
+  padding: 0 5px;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: clamp(0.9rem, 1.5vw, 1rem);
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+  color: #f2f2f2;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+  /* outline: 4px auto -webkit-focus-ring-color; */
+}
+
+.btn.connected {
+  color: #28a745;
+}
+
+.btn-word {
+  width: 50%;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.5em 1em;             
+  font-size: clamp(0.85rem, 1.2vw, 1rem); 
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  color: white;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: border-color 0.25s, color 0.25s;
+}
+
+.btn-word:hover {
+  border-color: #646cff;
+}
+
+.note {
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem); 
+  color: #f2f2f298;                           
+  margin-top: 0.5rem;
+  padding: 0 5px;                      
+  line-height: 1.4;                         
+  text-align: left;                          
+}
+
+/* Contenedor horizontal para texto + animación */
+.waiting-container {
+  display: flex;
+  align-items: center;    /* centra verticalmente texto y animación */
+  gap: 16px;              /* espacio entre texto y animación */
+  margin-top: 24px;
+}
+
+.waiting-container h3 {
+  font-size: clamp(1rem, 2vw, 1.25rem); /* tamaño responsivo */
+  margin: 0;
+}
+
+/* Newton's Cradle */
+.newtons-cradle {
+  --uib-size: 40px;       /* ajusta tamaño de la animación */
+  --uib-speed: 1.2s;
+  --uib-color: #f2f2f2c0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--uib-size);
+  height: var(--uib-size);
+}
+
+.newtons-cradle__dot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 25%;
+  transform-origin: center top;
+}
+
+.newtons-cradle__dot::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 25%;
+  border-radius: 50%;
+  background-color: var(--uib-color);
+}
+
+.newtons-cradle__dot:first-child {
+  animation: swing var(--uib-speed) linear infinite;
+}
+
+.newtons-cradle__dot:last-child {
+  animation: swing2 var(--uib-speed) linear infinite;
+}
+
+@keyframes swing {
+ 0% {
+  transform: rotate(0deg);
+  animation-timing-function: ease-out;
+ }
+ 25% {
+  transform: rotate(70deg);
+  animation-timing-function: ease-in;
+ }
+ 50% {
+  transform: rotate(0deg);
+  animation-timing-function: linear;
+ }
+}
+
+@keyframes swing2 {
+ 0% {
+  transform: rotate(0deg);
+  animation-timing-function: linear;
+ }
+ 50% {
+  transform: rotate(0deg);
+  animation-timing-function: ease-out;
+ }
+ 75% {
+  transform: rotate(-70deg);
+  animation-timing-function: ease-in;
+ }
+}
+
+.footer {
+  width: 100%;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.footer p {
+  font-size: clamp(0.75rem, 1.5vw, 1rem); /* tamaño fluido y responsivo */
+  color: #888;                             /* gris suave */
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}

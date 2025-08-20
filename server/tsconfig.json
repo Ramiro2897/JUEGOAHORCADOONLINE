@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    /* Directorios */
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    /* Compatibilidad */
+    "target": "ES2020",
+    "module": "CommonJS",
+
+    /* Node.js */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+
+    /* Buenas prácticas */
+    "strict": true
+  }
+}
