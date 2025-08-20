@@ -280,10 +280,10 @@ io.on("connection", (socket) => {
 });
 
 // Servir frontend build
-const clientDistPath = path.resolve(__dirname, "../client/dist"); // nota resolve
+const clientDistPath = path.join(process.cwd(), "client/dist");
 app.use(express.static(clientDistPath));
 
-app.get("/*", (req, res) => { // <-- cambiar "*" a "/*"
+app.get("*", (req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
