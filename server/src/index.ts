@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
+import path from "path";
 
 const app = express();
 app.use(cors());
@@ -10,10 +11,11 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "http://192.168.0.107:5173"], 
+    origin: "*", // permite cualquier cliente
     methods: ["GET", "POST"],
   },
 });
+
 
 type Role = "player1" | "player2";
 type RoomState = "lobby" | "waiting_word" | "playing" | "aborted";
@@ -275,6 +277,14 @@ io.on("connection", (socket) => {
       });
     }
   });
+});
+
+// Servir frontend build
+const clientDistPath = path.resolve(__dirname, "../client/dist"); // nota resolve
+app.use(express.static(clientDistPath));
+
+app.get("/*", (req, res) => { // <-- cambiar "*" a "/*"
+  res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 const PORT = 4000;
