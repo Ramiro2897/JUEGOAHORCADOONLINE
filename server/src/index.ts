@@ -280,12 +280,13 @@ io.on("connection", (socket) => {
 });
 
 // Servir frontend build
-const clientDistPath = path.join(process.cwd(), "client/dist");
+const clientDistPath = path.join(__dirname, "../../client/dist");
 app.use(express.static(clientDistPath));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
+
 
 const PORT = 4000;
 httpServer.listen(PORT, '0.0.0.0', () => {
