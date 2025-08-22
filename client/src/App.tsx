@@ -220,7 +220,7 @@ function App() {
         <div style={{ marginTop: 24 }}>
           <h3>Ingresa la palabra secreta</h3>
           <input
-            type="password"
+            type="text"
             placeholder="Solo letras A-Z, 3-20"
             value={secretWord}
             onChange={(e) => setSecretWord(e.target.value)}
@@ -237,12 +237,16 @@ function App() {
       {/* Vista de J2: esperando */}
       {selectedRole === "player2" && phase === "waiting" && (
         <div className="waiting-container">
-          <h3>Esperando a que el Jugador 1 defina la palabra...</h3>
-          <div className="newtons-cradle">
-            <div className="newtons-cradle__dot"></div>
-            <div className="newtons-cradle__dot"></div>
-            <div className="newtons-cradle__dot"></div>
-            <div className="newtons-cradle__dot"></div>
+          <p className="loading">Esperando palabra del jugador 1</p>
+          <div className="loader">
+            <div className="block b_1"></div>
+            <div className="block b_2"></div>
+            <div className="block b_3"></div>
+            <div className="block b_4"></div>
+            <div className="block b_5"></div>
+            <div className="block b_6"></div>
+            <div className="block b_7"></div>
+            <div className="block b_8"></div>
           </div>
         </div>
       )}
@@ -255,21 +259,55 @@ function App() {
             {revealed.join(" ")}
           </div>
 
-          <p style={{ marginTop: 8 }}>
+          <p
+            style={{
+              marginTop: 20,
+              border: "1px solid #f2f2f223",
+              borderRadius: "5px",
+              padding: "6px 10px",
+              display: "inline-block",
+              backgroundColor: "rgba(255, 255, 255, 0.02)"
+            }}
+          >
             Fallos: {fails} / {maxFails}
           </p>
 
           {wrong.length > 0 && (
-            <p style={{ marginTop: 4 }}>
+            <p
+              style={{
+                marginTop: 4,
+                border: "1px solid #f2f2f223", 
+                borderRadius: "5px",        
+                padding: "6px 10px",          
+                display: "inline-block",      
+                backgroundColor: "rgba(255, 255, 255, 0.02)" 
+              }}
+            >
               Letras falladas: {wrong.join(", ")}
             </p>
           )}
 
           {/* Mensajes de fin */}
           {gameOver && (
-            <p style={{ marginTop: 12, fontWeight: "bold" }}>
-              {gameWon ? "✅ ¡ADIVINASTE" : "❌ ¡PERDISTE!"}
-            </p>
+            gameWon ? (
+              <div className="celebration-container">
+                <p className="result-message win">¡Ganaste!</p>
+                <img
+                  src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3JsdXA3amJlY2QyNDNpd2ZoODJob3F5czgzMXZubHkzMDRuY3hwdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/mIZ9rPeMKefm0/giphy.gif"
+                  alt="¡Ganaste!"
+                  className="celebration-gif"
+                />
+              </div>
+            ) : (
+              <div className="hangman-container">
+                <p className="result-message lose">Ahorcado</p>
+                <img
+                  src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdmEzZzV6Nmdra2oxb3U0ZzE0OXlrNGN1dmdxbHM3ZTVxcDRjZzF4NyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ybQIv0CsYm1XY9A8Dm/giphy.gif"
+                  alt="Juego del Ahorcado"
+                  className="hangman-gif"
+                />
+              </div>
+            )
           )}
 
           {/* Input de adivinar SOLO para J2 y si no ha terminado */}
@@ -288,6 +326,15 @@ function App() {
           )}
         </div>
       )}
+
+      <div className="play-again">
+        <button
+          onClick={() => window.location.reload()}
+          className="btn-reload"
+        >
+          Otra
+        </button>
+      </div>
 
       <footer className="footer">
         <p>by Ramiro González {new Date().getFullYear()}</p>

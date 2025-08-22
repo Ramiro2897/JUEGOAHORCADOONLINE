@@ -213,9 +213,77 @@ button:focus-visible {
   text-align: left;                          
 }
 
+/* Mensajes de victoria */
+.play-message {
+  font-size: clamp(0.85rem, 1.2vw, 0.95rem);
+  font-weight: 600;
+  text-align: center;
+  color: #ffffff;
+  background: rgba(30, 30, 30, 0.85);
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin: 12px auto 0;
+  max-width: 90%;
+  line-height: 1.3;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+
+.result-message {
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.result-message.win {
+  color: #4caf50; /* verde para victoria */
+}
+
+.result-message.lose {
+  color: #f44336; /* rojo para derrota */
+}
+
+/* Contenedor de la celebración */
+.celebration-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* GIF de celebración */
+.celebration-gif {
+  max-width: 150px;
+  width: 50%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Contenedor del GIF del ahorcado */
+.hangman-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* GIF del ahorcado */
+.hangman-gif {
+  max-width: 150px;
+  width: 50%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+
 /* Contenedor horizontal para texto + animación */
 .waiting-container {
   display: flex;
+  flex-direction: column;
   align-items: center;    /* centra verticalmente texto y animación */
   gap: 16px;              /* espacio entre texto y animación */
   margin-top: 24px;
@@ -226,74 +294,119 @@ button:focus-visible {
   margin: 0;
 }
 
-/* Newton's Cradle */
-.newtons-cradle {
-  --uib-size: 40px;       /* ajusta tamaño de la animación */
-  --uib-speed: 1.2s;
-  --uib-color: #f2f2f2c0;
+.waiting-container .loading{
+  font-size: clamp(0.9rem, 1.5vw, 1rem);
+  padding: 4px 10px;
+  border-radius: 0px;
+}
+
+.loader {
+  height: 50px;
+  width: 50px;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--uib-size);
-  height: var(--uib-size);
 }
 
-.newtons-cradle__dot {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 100%;
-  width: 25%;
-  transform-origin: center top;
+.block {
+  height: 10px;
+  width: 10px;
+  background-color: #f2f2f2;
+  position: absolute;
+  opacity: 0;
 }
 
-.newtons-cradle__dot::after {
-  content: '';
-  display: block;
-  width: 100%;
-  height: 25%;
-  border-radius: 50%;
-  background-color: var(--uib-color);
+.b_1 {
+  top: 0;
+  left: 0;
+  animation: load 2s infinite;
+  animation-delay: 0;
 }
 
-.newtons-cradle__dot:first-child {
-  animation: swing var(--uib-speed) linear infinite;
+.b_2 {
+  top: 0;
+  left: 20px;
+  animation: load 2s infinite;
+  animation-delay: 0.25s;
 }
 
-.newtons-cradle__dot:last-child {
-  animation: swing2 var(--uib-speed) linear infinite;
+.b_3 {
+  top: 0;
+  right: 0;
+  animation: load 2s infinite;
+  animation-delay: 0.5s;
 }
 
-@keyframes swing {
- 0% {
-  transform: rotate(0deg);
-  animation-timing-function: ease-out;
- }
- 25% {
-  transform: rotate(70deg);
-  animation-timing-function: ease-in;
- }
- 50% {
-  transform: rotate(0deg);
-  animation-timing-function: linear;
- }
+.b_4 {
+  top: 20px;
+  right: 0;
+  animation: load 2s infinite;
+  animation-delay: 0.75s;
 }
 
-@keyframes swing2 {
- 0% {
-  transform: rotate(0deg);
-  animation-timing-function: linear;
- }
- 50% {
-  transform: rotate(0deg);
-  animation-timing-function: ease-out;
- }
- 75% {
-  transform: rotate(-70deg);
-  animation-timing-function: ease-in;
- }
+.b_5 {
+  bottom: 0;
+  right: 0;
+  animation: load 2s infinite;
+  animation-delay: 1s;
 }
+
+.b_6 {
+  bottom: 0;
+  left: 20px;
+  animation: load 2s infinite;
+  animation-delay: 1.25s;
+}
+
+.b_7 {
+  bottom: 0;
+  left: 0;
+  animation: load 2s infinite;
+  animation-delay: 1.5s;
+}
+
+.b_8 {
+  top: 20px;
+  left: 0;
+  animation: load 2s infinite;
+  animation-delay: 1.75s;
+}
+
+@keyframes load {
+  0% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.play-again {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.btn-reload {
+  width: 40%;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid transparent; /* <-- borde inicial invisible */
+  background-color: #1a1a1a;
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+  font-weight: 500;
+  color: #f2f2f2;
+  margin-top: 60px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s; /* incluir border-color en la transición */
+}
+
+.btn-reload:hover {
+  border-color: #646cff;
+}
+
 
 .footer {
   width: 100%;
