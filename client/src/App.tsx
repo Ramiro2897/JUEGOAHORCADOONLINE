@@ -237,7 +237,7 @@ function App() {
       {/* Vista de J2: esperando */}
       {selectedRole === "player2" && phase === "waiting" && (
         <div className="waiting-container">
-          <h3>Esperando a que el Jugador 1 defina la palabra</h3>
+          <h3>Esperando a que el Jugador 1 defina la palabra...</h3>
           <div className="newtons-cradle">
             <div className="newtons-cradle__dot"></div>
             <div className="newtons-cradle__dot"></div>
