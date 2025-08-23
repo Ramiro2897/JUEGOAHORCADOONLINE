@@ -39,8 +39,10 @@ interface GameRoom {
   createdAt: number;
 }
 
+// sala de jugadores
 const rooms = new Map<string, GameRoom>();
 
+// verifica si no hay un id en la sala si no la crea y se asigna esos valores
 function getOrCreateRoom(roomId: string): GameRoom {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
@@ -53,6 +55,7 @@ function getOrCreateRoom(roomId: string): GameRoom {
       maxFails: 6,
       createdAt: Date.now(),
     });
+    console.log("📌 Sala creada:", roomId, "Total salas:", rooms.size);
   }
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   return rooms.get(roomId)!;
@@ -69,13 +72,17 @@ function sanitizeWord(raw: string) {
 }
 
 io.on("connection", (socket) => {
+    console.log('alguien se conecto');
   // Para saber en qué sala está este socket
   let joinedRoomId: string | null = null;
 
+  // recibe el id de la sala del Client
   socket.on("room:join", ({ roomId }: { roomId: string }) => {
+    console.log('entra conn el id:', roomId);
     const room = getOrCreateRoom(roomId);
-    socket.join(roomId);
+    socket.join(roomId); //ingresa a la sala
     joinedRoomId = roomId;
+    console.log(joinedRoomId, 'este id se asigna aqui');
 
     // Responder con el estado actual de roles
     io.to(roomId).emit("room:update", {
@@ -186,12 +193,17 @@ io.on("connection", (socket) => {
   socket.on(
     "guess:letter",
     ({ roomId, letter }: { roomId: string; letter: string }) => {
+      console.log('id y letras', roomId, letter);
       const room = rooms.get(roomId);
-      if (!room || room.state !== "playing" || !room.word) return;
+      if (!room || room.state !== "playing" || !room.word) {
+        console.log('paso por aqui')
+        return;
+      }
 
       // sólo el Jugador 2 adivina
       const p2 = room.players.player2;
       if (!p2 || p2.socketId !== socket.id) {
+        console.log('no entro aca');
         socket.emit("error:msg", {
           code: "NOT_AUTHORIZED",
           message: "Sólo el Jugador 2 puede adivinar.",
@@ -218,6 +230,7 @@ io.on("connection", (socket) => {
       }
 
       if (room.word.includes(L)) {
+        console.log("¡Acierto!");
         // revelar todas las posiciones
         for (let i = 0; i < room.word.length; i++) {
           if (room.word[i] === L) room.revealed[i] = L;
@@ -225,6 +238,7 @@ io.on("connection", (socket) => {
       } else {
         room.wrong.add(L);
         room.fails += 1;
+        console.log('se añadio un fallo', room.fails, room.wrong);
       }
 
       // (Opcional) detectar fin de juego en servidor, pero mantenemos state en "playing".
@@ -242,6 +256,7 @@ io.on("connection", (socket) => {
   // ⬆️⬆️ FIN NUEVO
 
   socket.on("disconnect", () => {
+     console.log("❌ Jugador desconectado:", socket.id);
     // liberar roles y limpiar salas vacías
     if (!joinedRoomId) return;
     const room = rooms.get(joinedRoomId);
@@ -260,6 +275,7 @@ io.on("connection", (socket) => {
 
     if (!hasSomeone) {
       rooms.delete(joinedRoomId);
+      console.log("🗑️ Sala eliminada:", "Salas restantes:", rooms.size);
     } else {
       room.state = "aborted";
       io.to(joinedRoomId).emit("room:update", {

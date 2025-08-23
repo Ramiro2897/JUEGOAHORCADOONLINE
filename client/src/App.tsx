@@ -5,12 +5,13 @@ import { socket } from "./socket";
 type Role = "player1" | "player2";
 type Phase = "setup" | "chooseWord" | "waiting" | "playing";
 
+// genera el id de la sala
 function randomRoom() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
 function App() {
-  const [roomId, setRoomId] = useState<string>(randomRoom());
+  const [roomId, setRoomId] = useState<string>(randomRoom()); //id de la sala 
   const [connected, setConnected] = useState(false);
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -33,6 +34,20 @@ function App() {
   // input local del jugador 2
   const [letter, setLetter] = useState("");
 
+  // perdida de la conexion
+  useEffect(() => {
+    const onDisconnect = () => {
+      console.log("Se perdió la conexión con la sala");
+      setConnected(false); // 🔴 Ya no estamos en la sala
+    };
+
+    socket.on("disconnect", onDisconnect);
+
+    return () => {
+      socket.off("disconnect", onDisconnect);
+    };
+  }, []);
+
   // subscripción a eventos socket
   useEffect(() => {
     if (!connected) return;
@@ -42,8 +57,9 @@ function App() {
         player1Taken: payload.roles.player1Taken,
         player2Taken: payload.roles.player2Taken,
       });
-
+      //en espera
       if (payload.state === "waiting_word") {
+        // alert('en espera');
         setPhase(selectedRole === "player1" ? "chooseWord" : "waiting");
       }
 
@@ -54,6 +70,9 @@ function App() {
       }
 
       if (payload.hasWord && payload.revealed?.length) {
+        alert('entra...');
+        console.log(payload.fails, 'fallos', payload.maxFails)
+        // en partida...
         setRevealed(payload.revealed);
         setFails(payload.fails);
         setMaxFails(payload.maxFails);
@@ -63,6 +82,8 @@ function App() {
     };
 
     const onGameState = (payload: any) => {
+      console.log('game:state recibido', payload);
+      alert('un falloooooo');
       setRevealed(payload.revealed);
       setFails(payload.fails);
       setMaxFails(payload.maxFails);
@@ -85,7 +106,7 @@ function App() {
     };
   }, [connected, selectedRole]);
 
-  // conectar a la sala
+  // conectar a la sala manda el id de la sala al servidor
   const connectToRoom = () => {
     if (connected) return;
     socket.connect();
