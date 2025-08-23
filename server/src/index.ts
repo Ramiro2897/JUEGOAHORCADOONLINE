@@ -11,11 +11,12 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // permite cualquier cliente
+    origin: "*",
     methods: ["GET", "POST"],
   },
+  pingInterval: 10000, // Enviar ping cada 10s
+  pingTimeout: 5000,   // Timeout si no responde
 });
-
 
 type Role = "player1" | "player2";
 type RoomState = "lobby" | "waiting_word" | "playing" | "aborted";
@@ -31,18 +32,16 @@ interface GameRoom {
       }
     | undefined
   >;
-  word?: string; // solo en servidor
-  revealed: string[]; // p.ej. ['_', '_', 'A']
+  word?: string;
+  revealed: string[];
   wrong: Set<string>;
   fails: number;
   maxFails: number;
   createdAt: number;
 }
 
-// sala de jugadores
 const rooms = new Map<string, GameRoom>();
 
-// verifica si no hay un id en la sala si no la crea y se asigna esos valores
 function getOrCreateRoom(roomId: string): GameRoom {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
@@ -57,34 +56,28 @@ function getOrCreateRoom(roomId: string): GameRoom {
     });
     console.log("📌 Sala creada:", roomId, "Total salas:", rooms.size);
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   return rooms.get(roomId)!;
 }
 
 function sanitizeWord(raw: string) {
-  // mayúsculas sin acentos, sólo letras A-Z
-  const normalized = raw
+  return raw
     .toUpperCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^A-Z]/g, "");
-  return normalized;
 }
 
+// ---------------- SOCKET.IO ----------------
 io.on("connection", (socket) => {
-    console.log('alguien se conecto');
-  // Para saber en qué sala está este socket
+  console.log("Cliente conectado:", socket.id);
+
   let joinedRoomId: string | null = null;
 
-  // recibe el id de la sala del Client
   socket.on("room:join", ({ roomId }: { roomId: string }) => {
-    console.log('entra conn el id:', roomId);
     const room = getOrCreateRoom(roomId);
-    socket.join(roomId); //ingresa a la sala
+    socket.join(roomId);
     joinedRoomId = roomId;
-    console.log(joinedRoomId, 'este id se asigna aqui');
 
-    // Responder con el estado actual de roles
     io.to(roomId).emit("room:update", {
       roomId,
       roles: {
@@ -112,8 +105,6 @@ io.on("connection", (socket) => {
       name: string;
     }) => {
       const room = getOrCreateRoom(roomId);
-
-      // rol ya ocupado
       const isTaken = room.players[role];
       if (isTaken && isTaken.socketId !== socket.id) {
         socket.emit("error:msg", {
@@ -123,10 +114,8 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // asignar rol
       room.players[role] = { socketId: socket.id, name: name || role };
 
-      // si ambos están listos pero no hay palabra, estamos esperando palabra
       if (room.players.player1 && room.players.player2 && !room.word) {
         room.state = "waiting_word";
       }
@@ -153,7 +142,6 @@ io.on("connection", (socket) => {
       const room = rooms.get(roomId);
       if (!room) return;
 
-      // sólo el player1 puede definir la palabra
       const p1 = room.players.player1;
       if (!p1 || p1.socketId !== socket.id) {
         socket.emit("error:msg", {
@@ -189,21 +177,14 @@ io.on("connection", (socket) => {
     }
   );
 
-  // ⬇️⬇️ NUEVO: J2 envía una letra
   socket.on(
     "guess:letter",
     ({ roomId, letter }: { roomId: string; letter: string }) => {
-      console.log('id y letras', roomId, letter);
       const room = rooms.get(roomId);
-      if (!room || room.state !== "playing" || !room.word) {
-        console.log('paso por aqui')
-        return;
-      }
+      if (!room || room.state !== "playing" || !room.word) return;
 
-      // sólo el Jugador 2 adivina
       const p2 = room.players.player2;
       if (!p2 || p2.socketId !== socket.id) {
-        console.log('no entro aca');
         socket.emit("error:msg", {
           code: "NOT_AUTHORIZED",
           message: "Sólo el Jugador 2 puede adivinar.",
@@ -220,7 +201,6 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // letra repetida
       if (room.revealed.includes(L) || room.wrong.has(L)) {
         socket.emit("error:msg", {
           code: "REPEATED_LETTER",
@@ -230,19 +210,14 @@ io.on("connection", (socket) => {
       }
 
       if (room.word.includes(L)) {
-        console.log("¡Acierto!");
-        // revelar todas las posiciones
         for (let i = 0; i < room.word.length; i++) {
           if (room.word[i] === L) room.revealed[i] = L;
         }
       } else {
         room.wrong.add(L);
         room.fails += 1;
-        console.log('se añadio un fallo', room.fails, room.wrong);
       }
 
-      // (Opcional) detectar fin de juego en servidor, pero mantenemos state en "playing".
-      // El cliente ya muestra mensajes con fails/maxFails o si no hay "_".
       io.to(roomId).emit("game:state", {
         roomId,
         state: room.state,
@@ -253,11 +228,10 @@ io.on("connection", (socket) => {
       });
     }
   );
-  // ⬆️⬆️ FIN NUEVO
 
   socket.on("disconnect", () => {
-     console.log("❌ Jugador desconectado:", socket.id);
-    // liberar roles y limpiar salas vacías
+    console.log("Cliente desconectado:", socket.id);
+
     if (!joinedRoomId) return;
     const room = rooms.get(joinedRoomId);
     if (!room) return;
@@ -269,10 +243,7 @@ io.on("connection", (socket) => {
       room.players.player2 = undefined;
     }
 
-    // si no queda nadie, eliminar sala
-    const hasSomeone =
-      !!room.players.player1 || !!room.players.player2 || false;
-
+    const hasSomeone = !!room.players.player1 || !!room.players.player2;
     if (!hasSomeone) {
       rooms.delete(joinedRoomId);
       console.log("🗑️ Sala eliminada:", "Salas restantes:", rooms.size);
@@ -295,18 +266,14 @@ io.on("connection", (socket) => {
   });
 });
 
-// Servir frontend build
+// Servir frontend
 const clientDistPath = path.join(__dirname, "../../client/dist");
 app.use(express.static(clientDistPath));
-
 app.get("*", (req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
-
 const PORT = 4000;
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Servidor corriendo en http://0.0.0.0:${PORT}`);
 });
-
-

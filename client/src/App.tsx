@@ -11,7 +11,7 @@ function randomRoom() {
 }
 
 function App() {
-  const [roomId, setRoomId] = useState<string>(randomRoom()); //id de la sala 
+  const [roomId, setRoomId] = useState<string>(randomRoom());
   const [connected, setConnected] = useState(false);
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -29,16 +29,28 @@ function App() {
   const [revealed, setRevealed] = useState<string[]>([]);
   const [fails, setFails] = useState(0);
   const [maxFails, setMaxFails] = useState(6);
-  const [wrong, setWrong] = useState<string[]>([]); // ⬅️ NUEVO: letras falladas
+  const [wrong, setWrong] = useState<string[]>([]);
 
   // input local del jugador 2
   const [letter, setLetter] = useState("");
 
-  // perdida de la conexion
+  // mensajes de error
+  const [errors, setErrors] = useState<string[]>([]);
+
+  // helper para mostrar errores temporales
+  const addError = (msg: string) => {
+    setErrors((prev) => [...prev, msg]);
+    setTimeout(() => {
+      setErrors((prev) => prev.filter((e) => e !== msg));
+    }, 5000);
+  };
+
+  // pérdida de la conexión
   useEffect(() => {
     const onDisconnect = () => {
       console.log("Se perdió la conexión con la sala");
-      setConnected(false); // 🔴 Ya no estamos en la sala
+      setConnected(false);
+      addError("Conexión perdida con el servidor");
     };
 
     socket.on("disconnect", onDisconnect);
@@ -57,42 +69,39 @@ function App() {
         player1Taken: payload.roles.player1Taken,
         player2Taken: payload.roles.player2Taken,
       });
-      //en espera
-      if (payload.state === "waiting_word") {
-        // alert('en espera');
-        setPhase(selectedRole === "player1" ? "chooseWord" : "waiting");
-      }
 
-      if (payload.state === "aborted") {
-        setPhase("setup");
-        setSelectedRole(null);
-        setPlayerName("");
-      }
-
-      if (payload.hasWord && payload.revealed?.length) {
-        alert('entra...');
-        console.log(payload.fails, 'fallos', payload.maxFails)
-        // en partida...
-        setRevealed(payload.revealed);
-        setFails(payload.fails);
-        setMaxFails(payload.maxFails);
-        setWrong(payload.wrong ?? []); // ⬅️ NUEVO
-        setPhase("playing");
+      // actualizar fase según el estado real del servidor
+      switch (payload.state) {
+        case "waiting_word":
+          setPhase(selectedRole === "player1" ? "chooseWord" : "waiting");
+          break;
+        case "playing":
+          setRevealed(payload.revealed);
+          setFails(payload.fails);
+          setMaxFails(payload.maxFails);
+          setWrong(payload.wrong ?? []);
+          setPhase("playing");
+          break;
+        case "aborted":
+          setPhase("setup");
+          setSelectedRole(null);
+          setPlayerName("");
+          break;
+        default:
+          break;
       }
     };
 
     const onGameState = (payload: any) => {
-      console.log('game:state recibido', payload);
-      alert('un falloooooo');
       setRevealed(payload.revealed);
       setFails(payload.fails);
       setMaxFails(payload.maxFails);
-      setWrong(payload.wrong ?? []); // ⬅️ NUEVO
+      setWrong(payload.wrong ?? []);
       setPhase("playing");
     };
 
     const onError = (err: any) => {
-      alert(err?.message ?? "Error en el servidor");
+      addError(err?.message ?? "Error en el servidor");
     };
 
     socket.on("room:update", onRoomUpdate);
@@ -109,9 +118,15 @@ function App() {
   // conectar a la sala manda el id de la sala al servidor
   const connectToRoom = () => {
     if (connected) return;
-    socket.connect();
-    socket.emit("room:join", { roomId });
-    setConnected(true);
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    socket.once("connect", () => {
+      socket.emit("room:join", { roomId });
+      setConnected(true);
+    });
   };
 
   // elegir rol
@@ -132,7 +147,7 @@ function App() {
   const confirmRole = () => {
     if (!selectedRole) return;
     if (!playerName.trim()) {
-      alert("Ingresa tu nombre");
+      addError("Ingresa tu nombre");
       return;
     }
     socket.emit("role:pick", {
@@ -143,8 +158,10 @@ function App() {
   };
 
   const confirmWord = () => {
-    if (!secretWord.trim())
-      return alert("Ingresa una palabra (3-20 letras A-Z)");
+    if (!secretWord.trim()) {
+      addError("Ingresa una palabra (3-20 letras A-Z)");
+      return;
+    }
     socket.emit("word:set", { roomId, word: secretWord });
     setSecretWord("");
   };
@@ -158,7 +175,7 @@ function App() {
       .replace(/[^A-Z]/g, "");
 
     if (!clean || clean.length !== 1) {
-      alert("Ingresa una sola letra A-Z");
+      addError("Ingresa una sola letra A-Z");
       return;
     }
     socket.emit("guess:letter", { roomId, letter: clean });
@@ -173,8 +190,19 @@ function App() {
   return (
     <div className="app" style={{ maxWidth: 520, margin: "40px auto" }}>
       <div className="game">
-         <h1>🎮 El ahorcado</h1>
+        <h1>🎮 El ahorcado</h1>
       </div>
+
+      {/* Mostrar errores */}
+      {errors.length > 0 && (
+        <div className="errors-container">
+          {errors.map((err, idx) => (
+            <p key={idx} className="error-message">
+              {err}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* ID sala */}
       <div style={{ marginBottom: 16 }}>
@@ -186,14 +214,13 @@ function App() {
             placeholder="ROOMID"
             style={{ flex: 1 }}
           />
-          <button 
-            onClick={connectToRoom} 
+          <button
+            onClick={connectToRoom}
             disabled={connected}
             className={connected ? "btn connected" : "btn"}
           >
             {connected ? "Conectado" : "Entrar"}
           </button>
-
         </div>
         <small>Comparte este ID con el otro jugador.</small>
       </div>
@@ -246,7 +273,11 @@ function App() {
             value={secretWord}
             onChange={(e) => setSecretWord(e.target.value)}
           />
-          <button onClick={confirmWord} className="btn-word" style={{ marginLeft: 8 }}>
+          <button
+            onClick={confirmWord}
+            className="btn-word"
+            style={{ marginLeft: 8 }}
+          >
             Confirmar palabra
           </button>
           <p className="note" style={{ marginTop: 8 }}>
@@ -287,7 +318,7 @@ function App() {
               borderRadius: "5px",
               padding: "6px 10px",
               display: "inline-block",
-              backgroundColor: "rgba(255, 255, 255, 0.02)"
+              backgroundColor: "rgba(255, 255, 255, 0.02)",
             }}
           >
             Fallos: {fails} / {maxFails}
@@ -297,11 +328,11 @@ function App() {
             <p
               style={{
                 marginTop: 4,
-                border: "1px solid #f2f2f223", 
-                borderRadius: "5px",        
-                padding: "6px 10px",          
-                display: "inline-block",      
-                backgroundColor: "rgba(255, 255, 255, 0.02)" 
+                border: "1px solid #f2f2f223",
+                borderRadius: "5px",
+                padding: "6px 10px",
+                display: "inline-block",
+                backgroundColor: "rgba(255, 255, 255, 0.02)",
               }}
             >
               Letras falladas: {wrong.join(", ")}
@@ -349,10 +380,7 @@ function App() {
       )}
 
       <div className="play-again">
-        <button
-          onClick={() => window.location.reload()}
-          className="btn-reload"
-        >
+        <button onClick={() => window.location.reload()} className="btn-reload">
           Otra
         </button>
       </div>

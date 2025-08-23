@@ -1,23 +1,32 @@
-import { io } from "socket.io-client";
-
+import { io, Socket } from "socket.io-client";
 
 // https://juegoahorcadoonline.onrender.com ---- http://localhost:4000
-export const socket = io("https://juegoahorcadoonline.onrender.com", {
-  autoConnect: false, // nos conectamos cuando tengamos roomId
+
+// URL del servidor
+const SERVER_URL = "https://juegoahorcadoonline.onrender.com";
+
+// Creamos el socket pero **no se conecta automáticamente**
+export const socket: Socket = io(SERVER_URL, {
+  autoConnect: false, // nos conectamos manualmente desde App.tsx
   reconnection: true, // habilita reconexión automática
   reconnectionAttempts: Infinity, // intentos infinitos
-  reconnectionDelay: 1000, // 1s entre intentos
+  reconnectionDelay: 1000, // 1 segundo entre intentos
   transports: ["websocket"],
-})
+});
 
-// 2️⃣ Conectamos manualmente cuando queramos
-socket.connect();
-
-// 3️⃣ Escuchamos el evento de conexión para ver que el cliente se conectó
+// --- Eventos generales de conexión ---
 socket.on("connect", () => {
   console.log("Cliente conectado al servidor con id:", socket.id);
 });
 
 socket.on("disconnect", (reason) => {
   console.log("Cliente desconectado del servidor:", reason);
+});
+
+socket.on("connect_error", (err) => {
+  console.log("Error de conexión:", err.message);
+});
+
+socket.on("reconnect_attempt", (attempt) => {
+  console.log(`Intentando reconexión #${attempt}`);
 });
