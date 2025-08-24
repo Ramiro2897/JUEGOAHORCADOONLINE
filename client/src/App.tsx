@@ -93,6 +93,8 @@ function App() {
     };
 
     const onGameState = (payload: any) => {
+      alert('actuaizar recibido')
+      console.log("game:state recibido:", payload);
       setRevealed(payload.revealed);
       setFails(payload.fails);
       setMaxFails(payload.maxFails);

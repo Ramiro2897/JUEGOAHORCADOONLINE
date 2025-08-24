@@ -210,10 +210,13 @@ io.on("connection", (socket) => {
       }
 
       if (room.word.includes(L)) {
+         console.log(`✔ ${L}`);
         for (let i = 0; i < room.word.length; i++) {
           if (room.word[i] === L) room.revealed[i] = L;
         }
       } else {
+        console.log('fallo y aumenta en +1', room.fails)
+        console.log(`✖ ${L}`);
         room.wrong.add(L);
         room.fails += 1;
       }
