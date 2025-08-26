@@ -153,6 +153,24 @@ function App() {
     // onConnect se encargará de emitir room:join y role:pick guardados
   };
 
+  const startNewRoom = () => {
+  const newRoom = randomRoom();
+  setRoomId(newRoom);
+  setSelectedRole(null);
+  setPlayerName("");
+
+  localStorage.removeItem("roomId");
+  localStorage.removeItem("selectedRole");
+  localStorage.removeItem("playerName");
+
+  // Forzar nueva conexión con ID distinto
+  if (socket.connected) {
+    socket.disconnect();
+  }
+  socket.connect();
+  socket.emit("room:join", { roomId: newRoom });
+  };
+
   // -------- Manejo rol ----------
   const [askingNameFor, setAskingNameFor] = useState<Role | null>(null);
 
@@ -363,10 +381,11 @@ function App() {
       )}
 
       <div className="play-again">
-        <button onClick={() => window.location.reload()} className="btn-reload">
-          Otra
+        <button onClick={startNewRoom} className="btn-reload">
+          Nueva sala
         </button>
       </div>
+
 
       <footer className="footer">
         <p>by Ramiro González {new Date().getFullYear()}</p>
