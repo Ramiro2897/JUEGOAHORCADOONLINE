@@ -14,30 +14,29 @@ const io = new Server(httpServer, {
     origin: "*",
     methods: ["GET", "POST"],
   },
-  pingInterval: 10000, // Enviar ping cada 10s
-  pingTimeout: 5000,   // Timeout si no responde
+  pingInterval: 10000,
+  pingTimeout: 5000,
 });
 
 type Role = "player1" | "player2";
 type RoomState = "lobby" | "waiting_word" | "playing" | "aborted";
 
+interface PlayerSlot {
+  socketId: string;
+  name: string;
+}
+
 interface GameRoom {
   id: string;
   state: RoomState;
-  players: Record<
-    Role,
-    | {
-        socketId: string;
-        name: string;
-      }
-    | undefined
-  >;
+  players: Record<Role, PlayerSlot | undefined>;
   word?: string;
   revealed: string[];
   wrong: Set<string>;
   fails: number;
   maxFails: number;
   createdAt: number;
+  reconnectTimeout?: NodeJS.Timeout | null;
 }
 
 const rooms = new Map<string, GameRoom>();
@@ -53,6 +52,7 @@ function getOrCreateRoom(roomId: string): GameRoom {
       fails: 0,
       maxFails: 6,
       createdAt: Date.now(),
+      reconnectTimeout: null,
     });
     console.log("📌 Sala creada:", roomId, "Total salas:", rooms.size);
   }
@@ -78,11 +78,18 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     joinedRoomId = roomId;
 
+    // Si había un timeout pendiente para borrar la sala (por desconexión anterior), cancelarlo:
+    if (room.reconnectTimeout) {
+      clearTimeout(room.reconnectTimeout);
+      room.reconnectTimeout = null;
+    }
+
+    // Emitir estado actual de la sala al que acaba de entrar (y a todos)
     io.to(roomId).emit("room:update", {
       roomId,
       roles: {
-        player1Taken: !!room.players.player1,
-        player2Taken: !!room.players.player2,
+        player1Taken: !!room.players.player1?.socketId,
+        player2Taken: !!room.players.player2?.socketId,
       },
       state: room.state,
       hasWord: !!room.word,
@@ -105,8 +112,11 @@ io.on("connection", (socket) => {
       name: string;
     }) => {
       const room = getOrCreateRoom(roomId);
-      const isTaken = room.players[role];
-      if (isTaken && isTaken.socketId !== socket.id) {
+      const slot = room.players[role];
+
+      // Permite reclamar el slot si no hay un socketId activo, o si ya es tu socket
+      const takenByOther = slot && slot.socketId && slot.socketId !== socket.id;
+      if (takenByOther) {
         socket.emit("error:msg", {
           code: "ROLE_TAKEN",
           message: "Ese rol ya está ocupado.",
@@ -114,17 +124,28 @@ io.on("connection", (socket) => {
         return;
       }
 
-      room.players[role] = { socketId: socket.id, name: name || role };
+      // Asignar (o reasignar si estaba vacío)
+      room.players[role] = {
+        socketId: socket.id,
+        name: name || slot?.name || role,
+      };
 
-      if (room.players.player1 && room.players.player2 && !room.word) {
+      // Si existía un timeout (por si el jugador había caído), lo cancelamos
+      if (room.reconnectTimeout) {
+        clearTimeout(room.reconnectTimeout);
+        room.reconnectTimeout = null;
+      }
+
+      // actualizar estado si ambos están presentes y no hay palabra
+      if (room.players.player1?.socketId && room.players.player2?.socketId && !room.word) {
         room.state = "waiting_word";
       }
 
       io.to(roomId).emit("room:update", {
         roomId,
         roles: {
-          player1Taken: !!room.players.player1,
-          player2Taken: !!room.players.player2,
+          player1Taken: !!room.players.player1?.socketId,
+          player2Taken: !!room.players.player2?.socketId,
         },
         state: room.state,
         hasWord: !!room.word,
@@ -210,13 +231,10 @@ io.on("connection", (socket) => {
       }
 
       if (room.word.includes(L)) {
-         console.log(`✔ ${L}`);
         for (let i = 0; i < room.word.length; i++) {
           if (room.word[i] === L) room.revealed[i] = L;
         }
       } else {
-        console.log('fallo y aumenta en +1', room.fails)
-        console.log(`✖ ${L}`);
         room.wrong.add(L);
         room.fails += 1;
       }
@@ -239,32 +257,47 @@ io.on("connection", (socket) => {
     const room = rooms.get(joinedRoomId);
     if (!room) return;
 
+    // vaciar socketId (marcar desconectado) pero conservar datos del jugador
     if (room.players.player1?.socketId === socket.id) {
-      room.players.player1 = undefined;
+      room.players.player1.socketId = "";
     }
     if (room.players.player2?.socketId === socket.id) {
-      room.players.player2 = undefined;
+      room.players.player2.socketId = "";
     }
 
-    const hasSomeone = !!room.players.player1 || !!room.players.player2;
-    if (!hasSomeone) {
-      rooms.delete(joinedRoomId);
-      console.log("🗑️ Sala eliminada:", "Salas restantes:", rooms.size);
-    } else {
-      room.state = "aborted";
-      io.to(joinedRoomId).emit("room:update", {
-        roomId: room.id,
-        roles: {
-          player1Taken: !!room.players.player1,
-          player2Taken: !!room.players.player2,
-        },
-        state: room.state,
-        hasWord: !!room.word,
-        revealed: room.revealed,
-        wrong: Array.from(room.wrong),
-        fails: room.fails,
-        maxFails: room.maxFails,
-      });
+    // Avisar a quien quede en la sala (manteniendo el estado del juego)
+    io.to(joinedRoomId).emit("room:update", {
+      roomId: room.id,
+      roles: {
+        player1Taken: !!room.players.player1?.socketId,
+        player2Taken: !!room.players.player2?.socketId,
+      },
+      state: room.state,
+      hasWord: !!room.word,
+      revealed: room.revealed,
+      wrong: Array.from(room.wrong),
+      fails: room.fails,
+      maxFails: room.maxFails,
+    });
+
+    // Si nadie quedó online, programar eliminación tras X ms
+    const someoneOnline =
+      !!room.players.player1?.socketId || !!room.players.player2?.socketId;
+
+    if (!someoneOnline) {
+      // 30s de gracia antes de borrar
+      room.reconnectTimeout = setTimeout(() => {
+        const current = rooms.get(joinedRoomId!);
+        if (!current) return;
+
+        const stillNoOne =
+          !current.players.player1?.socketId && !current.players.player2?.socketId;
+
+        if (stillNoOne) {
+          rooms.delete(joinedRoomId!);
+          console.log("🗑️ Sala eliminada tras timeout:", joinedRoomId);
+        }
+      }, 30000);
     }
   });
 });
