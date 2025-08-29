@@ -78,8 +78,8 @@ function App() {
     setResultado("perdido");
   });
 
-  socket.on("letra:repetida", ({ mensaje }) => {
-    alert(mensaje); 
+  socket.on("letra:repetida", ({ }) => {
+    alert('ya usaste esta letra'); 
   });
 
 

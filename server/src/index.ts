@@ -238,7 +238,6 @@ socket.on(
       room.fails++;
     }
 
-
     // chequear condiciones de victoria o derrota
     const todasReveladas = room.revealed.every((l) => l !== "_");
     if (todasReveladas) {
