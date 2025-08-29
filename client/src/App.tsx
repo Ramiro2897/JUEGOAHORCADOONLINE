@@ -69,12 +69,10 @@ function App() {
   });
 
   socket.on("juego:ganado", ({ }) => {
-    alert('gano el idiota')
     setResultado("ganado");
   });
 
     socket.on("juego:perdido", ({ }) => {
-    alert('perdió el idiota');
     setResultado("perdido");
   });
 
