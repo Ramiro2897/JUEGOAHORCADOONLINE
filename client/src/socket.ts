@@ -1,13 +1,13 @@
 import { io, Socket } from "socket.io-client";
 
-// https://juegoahorcadoonline.onrender.com ---- http://localhost:4000
+// https://juegoahorcadoonline.onrender.com ---- http://localhost:4000 --- http://192.168.0.107:4000
 
 // URL del servidor
 const SERVER_URL = "https://juegoahorcadoonline.onrender.com";
 
 // Creamos el socket pero **no se conecta automáticamente**
 export const socket: Socket = io(SERVER_URL, {
-  autoConnect: false, // nos conectamos manualmente desde App.tsx
+  autoConnect: true, // nos conectamos manualmente desde App.tsx
   reconnection: true, // habilita reconexión automática
   reconnectionAttempts: Infinity, // intentos infinitos
   reconnectionDelay: 1000, // 1 segundo entre intentos

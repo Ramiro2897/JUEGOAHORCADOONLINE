@@ -18,11 +18,12 @@ const io = new Server(httpServer, {
   pingTimeout: 5000,
 });
 
-type Role = "player1" | "player2";
+type Role = "jugador1" | "jugador2";
 type RoomState = "lobby" | "waiting_word" | "playing" | "aborted";
 
 interface PlayerSlot {
   socketId: string;
+  userId: string;   // ⚡ el id del usuario que viene del cliente
   name: string;
 }
 
@@ -37,269 +38,231 @@ interface GameRoom {
   maxFails: number;
   createdAt: number;
   reconnectTimeout?: NodeJS.Timeout | null;
+  connections: Record<string, { socketId: string; userId: string }>;
+  resultado?: "ganado" | "perdido" | null; 
 }
 
 const rooms = new Map<string, GameRoom>();
 
-function getOrCreateRoom(roomId: string): GameRoom {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      id: roomId,
+// ---------------- SOCKET.IO ----------------
+io.on("connection", (socket) => {
+  socket.on("entrar:sala", ({ salaId, userId }: { salaId: string; userId: string }) => {
+  console.log('alguien entro a la sala');
+  // obtener o crear la sala (no se asignan roles aquí)
+  let room = rooms.get(salaId);
+
+  if (!room) {
+    const newRoom: GameRoom = {
+      id: salaId,
       state: "lobby",
-      players: { player1: undefined, player2: undefined },
+      players: { jugador1: undefined, jugador2: undefined },
+      word: undefined,
       revealed: [],
-      wrong: new Set(),
+      wrong: new Set<string>(),
       fails: 0,
       maxFails: 6,
       createdAt: Date.now(),
       reconnectTimeout: null,
-    });
-    console.log("📌 Sala creada:", roomId, "Total salas:", rooms.size);
+      connections: {} as Record<string, { socketId: string; userId: string }>,
+      resultado: null,
+    };
+
+    rooms.set(salaId, newRoom);
+    room = newRoom; // ahora room SIEMPRE es GameRoom
   }
-  return rooms.get(roomId)!;
-}
 
-function sanitizeWord(raw: string) {
-  return raw
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Z]/g, "");
-}
+  // asegurar que exista el mapa de conexiones
+  if (!((room as any).connections)) (room as any).connections = {};
 
-// ---------------- SOCKET.IO ----------------
-io.on("connection", (socket) => {
-  console.log("Cliente conectado:", socket.id);
+  const connections = (room as any).connections as Record<string, { socketId: string; userId: string }>;
 
-  let joinedRoomId: string | null = null;
+  if (connections[userId]) {
+  // Solo actualizar su socketId, no contamos como un nuevo jugador
+  connections[userId].socketId = socket.id;
+} else {
+  // contar usuarios conectados actualmente (solo por conexiones)
+  const currentCount = Object.keys(connections).length;
 
-  socket.on("room:join", ({ roomId }: { roomId: string }) => {
-    const room = getOrCreateRoom(roomId);
-    socket.join(roomId);
-    joinedRoomId = roomId;
+  if (currentCount >= 2) {
+    console.log('sala llena');
+    socket.emit("sala:llena", { mensaje: "La sala ya tiene 2 jugadores." });
+    return;
+  }
+  // registrar/actualizar la conexión del usuario (nuevo)
+  connections[userId] = { socketId: socket.id, userId };
+  }
 
-    // Si había un timeout pendiente para borrar la sala (por desconexión anterior), cancelarlo:
-    if (room.reconnectTimeout) {
-      clearTimeout(room.reconnectTimeout);
-      room.reconnectTimeout = null;
-    }
-
-    // Emitir estado actual de la sala al que acaba de entrar (y a todos)
-    io.to(roomId).emit("room:update", {
-      roomId,
-      roles: {
-        player1Taken: !!room.players.player1?.socketId,
-        player2Taken: !!room.players.player2?.socketId,
-      },
-      state: room.state,
-      hasWord: !!room.word,
-      revealed: room.revealed,
-      wrong: Array.from(room.wrong),
-      fails: room.fails,
-      maxFails: room.maxFails,
-    });
+  // unir el socket a la sala de socket.io
+  socket.join(salaId);
+  // ✅ Enviar confirmación SOLO al que entra
+  socket.emit("sala:entrada:ok", { salaId, userId });
+  // console.log("Estado actual de la sala:", JSON.stringify(room, null, 2));
+  io.to(salaId).emit("sala:actualizada", {
+    ...room,
+    wrong: Array.from(room.wrong),  // convertimos Set a Array
   });
+});
 
-  socket.on(
-    "role:pick",
-    ({
-      roomId,
-      role,
-      name,
-    }: {
-      roomId: string;
-      role: Role;
-      name: string;
-    }) => {
-      const room = getOrCreateRoom(roomId);
-      const slot = room.players[role];
-
-      // Permite reclamar el slot si no hay un socketId activo, o si ya es tu socket
-      const takenByOther = slot && slot.socketId && slot.socketId !== socket.id;
-      if (takenByOther) {
-        socket.emit("error:msg", {
-          code: "ROLE_TAKEN",
-          message: "Ese rol ya está ocupado.",
-        });
-        return;
-      }
-
-      // Asignar (o reasignar si estaba vacío)
-      room.players[role] = {
-        socketId: socket.id,
-        name: name || slot?.name || role,
-      };
-
-      // Si existía un timeout (por si el jugador había caído), lo cancelamos
-      if (room.reconnectTimeout) {
-        clearTimeout(room.reconnectTimeout);
-        room.reconnectTimeout = null;
-      }
-
-      // actualizar estado si ambos están presentes y no hay palabra
-      if (room.players.player1?.socketId && room.players.player2?.socketId && !room.word) {
-        room.state = "waiting_word";
-      }
-
-      io.to(roomId).emit("room:update", {
-        roomId,
-        roles: {
-          player1Taken: !!room.players.player1?.socketId,
-          player2Taken: !!room.players.player2?.socketId,
-        },
-        state: room.state,
-        hasWord: !!room.word,
-        revealed: room.revealed,
-        wrong: Array.from(room.wrong),
-        fails: room.fails,
-        maxFails: room.maxFails,
-      });
+// cuando se asinga un rol escucha
+socket.on(
+  "asignar:rol",
+  ({
+    salaId,
+    userId,
+    rol,
+    nombre,
+  }: {
+    salaId: string;
+    userId: string;
+    rol: "jugador1" | "jugador2";
+    nombre: string;
+  }) => {
+    const room = rooms.get(salaId);
+    if (!room) {
+      socket.emit("error", { mensaje: "Sala no encontrada" });
+      return;
     }
-  );
 
-  socket.on(
-    "word:set",
-    ({ roomId, word }: { roomId: string; word: string }) => {
-      const room = rooms.get(roomId);
-      if (!room) return;
+    // actualizar el jugador correspondiente
+    room.players[rol] = {
+      socketId: socket.id,
+      userId,
+      name: nombre,
+    };
 
-      const p1 = room.players.player1;
-      if (!p1 || p1.socketId !== socket.id) {
-        socket.emit("error:msg", {
-          code: "NOT_AUTHORIZED",
-          message: "Sólo el Jugador 1 puede definir la palabra.",
-        });
-        return;
-      }
+    console.log(`Jugador asignado: ${rol} -> ${nombre}`);
+    console.log("Sala actualizada:", JSON.stringify(room, null, 2));
 
-      const clean = sanitizeWord(word);
-      if (clean.length < 3 || clean.length > 20) {
-        socket.emit("error:msg", {
-          code: "INVALID_WORD",
-          message: "La palabra debe tener entre 3 y 20 letras A-Z.",
-        });
-        return;
-      }
+    // emitir a todos en la sala que se actualizó
+    io.to(salaId).emit("sala:actualizada", room);
+  }
+);
 
-      room.word = clean;
-      room.revealed = Array.from({ length: clean.length }, () => "_");
-      room.wrong.clear();
-      room.fails = 0;
-      room.state = "playing";
-
-      io.to(roomId).emit("game:state", {
-        roomId,
-        state: room.state,
-        revealed: room.revealed,
-        wrong: Array.from(room.wrong),
-        fails: room.fails,
-        maxFails: room.maxFails,
-      });
+// cuando se asigna la palabra
+socket.on(
+  "definir:palabra",
+  ({
+    salaId,
+    userId,
+    palabra,
+  }: {
+    salaId: string;
+    userId: string;
+    palabra: string;
+  }) => {
+    console.log("📩 Definir palabra recibido:", { salaId, userId, palabra });
+    const room = rooms.get(salaId);
+    if (!room) {
+      console.log('error en la sala');
+      socket.emit("error", { mensaje: "Sala no encontrada" });
+      return;
     }
-  );
 
-  socket.on(
-    "guess:letter",
-    ({ roomId, letter }: { roomId: string; letter: string }) => {
-      const room = rooms.get(roomId);
-      if (!room || room.state !== "playing" || !room.word) return;
-
-      const p2 = room.players.player2;
-      if (!p2 || p2.socketId !== socket.id) {
-        socket.emit("error:msg", {
-          code: "NOT_AUTHORIZED",
-          message: "Sólo el Jugador 2 puede adivinar.",
-        });
-        return;
-      }
-
-      const L = sanitizeWord(letter).slice(0, 1);
-      if (!L) {
-        socket.emit("error:msg", {
-          code: "INVALID_LETTER",
-          message: "Ingresa una letra A-Z.",
-        });
-        return;
-      }
-
-      if (room.revealed.includes(L) || room.wrong.has(L)) {
-        socket.emit("error:msg", {
-          code: "REPEATED_LETTER",
-          message: "Esa letra ya fue probada.",
-        });
-        return;
-      }
-
-      if (room.word.includes(L)) {
-        for (let i = 0; i < room.word.length; i++) {
-          if (room.word[i] === L) room.revealed[i] = L;
-        }
-      } else {
-        room.wrong.add(L);
-        room.fails += 1;
-      }
-
-      io.to(roomId).emit("game:state", {
-        roomId,
-        state: room.state,
-        revealed: room.revealed,
-        wrong: Array.from(room.wrong),
-        fails: room.fails,
-        maxFails: room.maxFails,
-      });
+    // validar que quien envía la palabra sea jugador1
+    console.log("📦 Estado actual de players:", room.players);
+    if (room.players.jugador1?.userId !== userId) {
+      console.log('error en el jugador', room.players.jugador1?.userId);
+      socket.emit("error", { mensaje: "Solo el Jugador 1 puede definir la palabra." });
+      return;
     }
-  );
+
+
+    // limpiar palabra: solo letras A-Z, sin espacios ni acentos
+    const limpia = palabra
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // quitar acentos
+      .replace(/[^a-zA-Z]/g, "") // solo letras
+      .toUpperCase();
+
+    if (limpia.length < 3 || limpia.length > 20) {
+      console.log('error de letra');
+      socket.emit("error", { mensaje: "La palabra debe tener entre 3 y 20 letras." });
+      return;
+    }
+
+    // asignar palabra al objeto sala
+    room.word = limpia;
+    room.state = "waiting_word"; // opcional: actualizar estado
+    // 👇 Inicializamos los guiones bajos
+    room.revealed = Array(limpia.length).fill("_");
+
+    console.log(`Palabra definida por Jugador 1: ${limpia}`);
+    console.log("Sala actualizada:", JSON.stringify(room, null, 2));
+
+    // emitir la sala actualizada a todos
+    io.to(salaId).emit("sala:actualizada", room);
+  }
+);
+
+// cuando jugador2 prueba una letra
+socket.on(
+  "probar:letra",
+  ({ salaId, userId, letra }: { salaId: string; userId: string; letra: string }) => {
+    console.log('letra recibida', letra, userId, salaId);
+    const room = rooms.get(salaId);
+    if (!room || !room.word) {
+      socket.emit("error", { mensaje: "Sala o palabra no encontrada." });
+      return;
+    }
+
+    // validar que exista jugador2 y que sea él quien manda
+    if (!room.players.jugador2 || room.players.jugador2.userId !== userId) {
+      socket.emit("error", { mensaje: "Solo el Jugador 2 puede probar letras." });
+      return;
+    }
+
+    const letraMayus = letra.toUpperCase();
+
+    // si ya la probó antes, no hacemos nada
+    if (room.revealed.includes(letraMayus) || room.wrong.has(letraMayus)) {
+      // buscamos el socket del jugador2
+      const jugador2SocketId = room.players.jugador2?.socketId;
+      if (jugador2SocketId) {
+        io.to(jugador2SocketId).emit("letra:repetida", {
+          mensaje: `Ya probaste la letra ${letraMayus}`
+        });
+      }
+      return;
+    }
+
+    // revisar si la letra está en la palabra
+    if (room.word.includes(letraMayus)) {
+  // Revelar todas las posiciones donde aparezca la letra
+  room.word.split("").forEach((l, idx) => {
+    if (l === letraMayus) {
+      room.revealed[idx] = letraMayus;
+    }
+    });
+    } else {
+      room.wrong.add(letraMayus);
+      room.fails++;
+    }
+
+
+    // chequear condiciones de victoria o derrota
+    const todasReveladas = room.revealed.every((l) => l !== "_");
+    if (todasReveladas) {
+      room.resultado = "ganado"; // <-- guardamos estado
+      io.to(salaId).emit("juego:ganado", { salaId });
+    } else if (room.fails >= room.maxFails) {
+      room.resultado = "perdido";
+      console.log('perdio el idiota')
+      io.to(salaId).emit("juego:perdido", { salaId });
+    }
+
+    console.log("📌 Estado final de la salaaaaaaa:", JSON.stringify(room, null, 2));
+    // emitir sala actualizada siempre
+    io.to(salaId).emit("sala:actualizada", {
+  ...room,
+  wrong: Array.from(room.wrong)
+  });
+  }
+);
 
   socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id);
-
-    if (!joinedRoomId) return;
-    const room = rooms.get(joinedRoomId);
-    if (!room) return;
-
-    // vaciar socketId (marcar desconectado) pero conservar datos del jugador
-    if (room.players.player1?.socketId === socket.id) {
-      room.players.player1.socketId = "";
-    }
-    if (room.players.player2?.socketId === socket.id) {
-      room.players.player2.socketId = "";
-    }
-
-    // Avisar a quien quede en la sala (manteniendo el estado del juego)
-    io.to(joinedRoomId).emit("room:update", {
-      roomId: room.id,
-      roles: {
-        player1Taken: !!room.players.player1?.socketId,
-        player2Taken: !!room.players.player2?.socketId,
-      },
-      state: room.state,
-      hasWord: !!room.word,
-      revealed: room.revealed,
-      wrong: Array.from(room.wrong),
-      fails: room.fails,
-      maxFails: room.maxFails,
-    });
-
-    // Si nadie quedó online, programar eliminación tras X ms
-    const someoneOnline =
-      !!room.players.player1?.socketId || !!room.players.player2?.socketId;
-
-    if (!someoneOnline) {
-      // 30s de gracia antes de borrar
-      room.reconnectTimeout = setTimeout(() => {
-        const current = rooms.get(joinedRoomId!);
-        if (!current) return;
-
-        const stillNoOne =
-          !current.players.player1?.socketId && !current.players.player2?.socketId;
-
-        if (stillNoOne) {
-          rooms.delete(joinedRoomId!);
-          console.log("🗑️ Sala eliminada tras timeout:", joinedRoomId);
-        }
-      }, 30000);
-    }
+    // console.log("Cliente desconectado:", socket.id);
   });
+
 });
 
 // Servir frontend
