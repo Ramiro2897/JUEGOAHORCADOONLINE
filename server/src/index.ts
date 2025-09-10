@@ -47,7 +47,7 @@ const rooms = new Map<string, GameRoom>();
 // ---------------- SOCKET.IO ----------------
 io.on("connection", (socket) => {
   socket.on("entrar:sala", ({ salaId, userId }: { salaId: string; userId: string }) => {
-  console.log('alguien entro a la sala');
+    console.log('entrando a la sala', salaId);
   // obtener o crear la sala (no se asignan roles aquí)
   let room = rooms.get(salaId);
 
@@ -130,8 +130,8 @@ socket.on(
       name: nombre,
     };
 
-    console.log(`Jugador asignado: ${rol} -> ${nombre}`);
-    console.log("Sala actualizada:", JSON.stringify(room, null, 2));
+    // console.log(`Jugador asignado: ${rol} -> ${nombre}`);
+    // console.log("Sala actualizada:", JSON.stringify(room, null, 2));
 
     // emitir a todos en la sala que se actualizó
     io.to(salaId).emit("sala:actualizada", room);
@@ -150,22 +150,21 @@ socket.on(
     userId: string;
     palabra: string;
   }) => {
-    console.log("📩 Definir palabra recibido:", { salaId, userId, palabra });
+    // console.log("📩 Definir palabra recibido:", { salaId, userId, palabra });
     const room = rooms.get(salaId);
     if (!room) {
-      console.log('error en la sala');
+      // console.log('error en la sala');
       socket.emit("error", { mensaje: "Sala no encontrada" });
       return;
     }
 
     // validar que quien envía la palabra sea jugador1
-    console.log("📦 Estado actual de players:", room.players);
+    // console.log("📦 Estado actual de players:", room.players);
     if (room.players.jugador1?.userId !== userId) {
       console.log('error en el jugador', room.players.jugador1?.userId);
       socket.emit("error", { mensaje: "Solo el Jugador 1 puede definir la palabra." });
       return;
     }
-
 
     // limpiar palabra: solo letras A-Z, sin espacios ni acentos
     const limpia = palabra
@@ -175,7 +174,7 @@ socket.on(
       .toUpperCase();
 
     if (limpia.length < 3 || limpia.length > 20) {
-      console.log('error de letra');
+      // console.log('error de letra');
       socket.emit("error", { mensaje: "La palabra debe tener entre 3 y 20 letras." });
       return;
     }
@@ -186,8 +185,8 @@ socket.on(
     // 👇 Inicializamos los guiones bajos
     room.revealed = Array(limpia.length).fill("_");
 
-    console.log(`Palabra definida por Jugador 1: ${limpia}`);
-    console.log("Sala actualizada:", JSON.stringify(room, null, 2));
+    // console.log(`Palabra definida por Jugador 1: ${limpia}`);
+    // console.log("Sala actualizada:", JSON.stringify(room, null, 2));
 
     // emitir la sala actualizada a todos
     io.to(salaId).emit("sala:actualizada", room);
@@ -201,12 +200,14 @@ socket.on(
     console.log('letra recibida', letra, userId, salaId);
     const room = rooms.get(salaId);
     if (!room || !room.word) {
+      console.log('Sala o palabra no encontrada');
       socket.emit("error", { mensaje: "Sala o palabra no encontrada." });
       return;
     }
 
     // validar que exista jugador2 y que sea él quien manda
     if (!room.players.jugador2 || room.players.jugador2.userId !== userId) {
+      console.log('Solo el Jugador 2 puede probar letras');
       socket.emit("error", { mensaje: "Solo el Jugador 2 puede probar letras." });
       return;
     }
@@ -227,13 +228,15 @@ socket.on(
 
     // revisar si la letra está en la palabra
     if (room.word.includes(letraMayus)) {
-  // Revelar todas las posiciones donde aparezca la letra
-  room.word.split("").forEach((l, idx) => {
+    // Revelar todas las posiciones donde aparezca la letra
+      room.word.split("").forEach((l, idx) => {
     if (l === letraMayus) {
       room.revealed[idx] = letraMayus;
+      console.log('letra en la palabraaaaaaa')
     }
     });
     } else {
+      console.log('fallos y letras agregados')
       room.wrong.add(letraMayus);
       room.fails++;
     }
@@ -242,19 +245,20 @@ socket.on(
     const todasReveladas = room.revealed.every((l) => l !== "_");
     if (todasReveladas) {
       room.resultado = "ganado"; // <-- guardamos estado
+      console.log('ganó el idiota');
       io.to(salaId).emit("juego:ganado", { salaId });
     } else if (room.fails >= room.maxFails) {
       room.resultado = "perdido";
-      console.log('perdio el idiota')
+      console.log('perdio el idiota');
       io.to(salaId).emit("juego:perdido", { salaId });
     }
 
     console.log("📌 Estado final de la salaaaaaaa:", JSON.stringify(room, null, 2));
     // emitir sala actualizada siempre
     io.to(salaId).emit("sala:actualizada", {
-  ...room,
-  wrong: Array.from(room.wrong)
-  });
+    ...room,
+    wrong: Array.from(room.wrong)
+    });
   }
 );
 

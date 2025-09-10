@@ -62,7 +62,7 @@ function App() {
   });
 
    socket.on("sala:actualizada", (room) => {
-    alert('rebido se actualizo la sala')
+    // alert('rebido se actualizo la sala')
     console.log("📩 Sala actualizada:", room);
     setSala(room);
     setResultado(room?.resultado ?? null);
@@ -79,7 +79,6 @@ function App() {
   socket.on("letra:repetida", ({ }) => {
     alert('ya usaste esta letra'); 
   });
-
 
   return () => {
     socket.off("sala:entrada:ok");
