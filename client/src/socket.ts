@@ -3,7 +3,7 @@ import { io, Socket } from "socket.io-client";
 // https://juegoahorcadoonline.onrender.com ---- http://localhost:4000 --- http://192.168.0.107:4000
 
 // URL del servidor
-const SERVER_URL = "http://localhost:4000";
+const SERVER_URL = "https://juegoahorcadoonline.onrender.com";
 
 // Creamos el socket pero **no se conecta automáticamente**
 export const socket: Socket = io(SERVER_URL, {
