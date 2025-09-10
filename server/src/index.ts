@@ -275,7 +275,7 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
-const PORT = 4000;
+const PORT = Number(process.env.PORT) || 4000;
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Servidor corriendo en http://0.0.0.0:${PORT}`);
 });
